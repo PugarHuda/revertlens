@@ -18,13 +18,18 @@ export async function POST(req: Request): Promise<Response> {
     const body = (await req.json()) as Record<string, unknown>;
     const network: Network = body.network === "mainnet" ? "mainnet" : "testnet";
 
+    // The deterministic linter + on-chain decode is the public surface. The AI
+    // long-tail calls a paid/rate-limited model, so it's OFF on this public
+    // endpoint unless explicitly opted in (prevents key-burning by traffic).
+    const useAI = process.env.REVERTLENS_PUBLIC_AI === "1";
+
     let analysis: Analysis;
     if (body.mode === "tx") {
       const hash = String(body.hash ?? "").trim();
       if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
         return json({ error: "Invalid transaction hash (expected 0x + 64 hex)." }, 400);
       }
-      analysis = await analyzeTx(network, hash);
+      analysis = await analyzeTx(network, hash, useAI);
     } else {
       const to = String(body.to ?? "").trim();
       const data = String(body.data ?? "").trim();
@@ -34,7 +39,7 @@ export async function POST(req: Request): Promise<Response> {
       if (!/^0x[0-9a-fA-F]{8,}$/.test(data)) {
         return json({ error: "Invalid calldata (need at least a 4-byte selector)." }, 400);
       }
-      analysis = await analyzeCall({ network, to, data });
+      analysis = await analyzeCall({ network, to, data, useAI });
     }
 
     return json(analysis, 200);

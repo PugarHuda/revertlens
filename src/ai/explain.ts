@@ -89,7 +89,7 @@ function toFinding(out: Explanation): Finding {
 }
 
 /** Defensively pull a JSON object out of model text (handles ```json fences / prose). */
-function extractJson(text: string): Explanation | null {
+export function extractJson(text: string): Explanation | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1] ?? text;
   const start = candidate.indexOf("{");
@@ -100,6 +100,13 @@ function extractJson(text: string): Explanation | null {
   } catch {
     return null;
   }
+}
+
+/** Reject malformed/partial model output — title + detail must be real strings. */
+function finalizeExplanation(out: Explanation | null): Finding | null {
+  if (!out || typeof out.title !== "string" || typeof out.detail !== "string") return null;
+  if (!out.title.trim() || !out.detail.trim()) return null;
+  return toFinding(out);
 }
 
 /** Ask the LLM to explain a revert we have no verified answer for. Returns a
@@ -121,34 +128,53 @@ export async function explainRevertWithAI(ctx: AIContext): Promise<Finding | nul
 }
 
 async function viaOpenRouter(userMsg: string): Promise<Finding | null> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-      "X-Title": "RevertLens",
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      max_tokens: 1500,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content:
-            userMsg +
-            `\n\nRespond with ONLY a JSON object: {"title": string, "detail": string, "suggestedFix": string, "confidence": number}.`,
-        },
-      ],
-      response_format: { type: "json_object" },
-    }),
+  const body = JSON.stringify({
+    model: OPENROUTER_MODEL,
+    max_tokens: 1500,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content:
+          userMsg +
+          `\n\nRespond with ONLY a JSON object: {"title": string, "detail": string, "suggestedFix": string, "confidence": number}.`,
+      },
+    ],
+    response_format: { type: "json_object" },
   });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) return null;
-  const out = extractJson(content);
-  return out ? toFinding(out) : null;
+
+  // One retry on rate-limit / upstream error — free models are bursty.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30_000);
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "X-Title": "RevertLens",
+        },
+        body,
+        signal: ctrl.signal,
+      });
+      if (res.ok) {
+        const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        const content = json.choices?.[0]?.message?.content;
+        return content ? finalizeExplanation(extractJson(content)) : null;
+      }
+      if (attempt === 0 && (res.status === 429 || res.status >= 500)) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      return null;
+    } catch {
+      return null; // timeout / network — no fake output
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
 }
 
 async function viaAnthropic(userMsg: string): Promise<Finding | null> {
@@ -163,6 +189,5 @@ async function viaAnthropic(userMsg: string): Promise<Finding | null> {
   if (res.stop_reason === "refusal") return null;
   const block = res.content.find((b) => b.type === "text");
   if (!block || block.type !== "text") return null;
-  const out = extractJson(block.text);
-  return out ? toFinding(out) : null;
+  return finalizeExplanation(extractJson(block.text));
 }

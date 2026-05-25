@@ -81,6 +81,7 @@ export async function analyzeTx(
   useAI = true,
 ): Promise<Analysis> {
   const tx = await getTransaction(network, hash);
+  if (tx === null) throw new Error("Transaction not found on this network.");
   if ("code" in tx) throw new Error(`RPC error fetching tx: ${tx.message}`);
   if (!tx.to) throw new Error("Transaction has no `to` (contract creation) — unsupported.");
   return analyzeCall({ network, to: tx.to, data: tx.input, useAI });
