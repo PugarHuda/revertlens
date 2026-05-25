@@ -51,10 +51,12 @@ Everything mechanically provable (precompile detection, ABI mismatch) is done
 **deterministically and labelled `verified`** — so the AI never hides a guess as a
 fact. (`src/types.ts` → `FindingSource`.)
 
-The AI explainer is **optional and degrades honestly**: set `ANTHROPIC_API_KEY`
-(see `.env.example`) to enable it. Without a key, RevertLens still works fully via
-the deterministic linter + live on-chain decoding — it just adds no AI-inferred
-findings. It never fabricates output. (`src/ai/explain.ts`, model `claude-opus-4-7`.)
+The AI explainer is **optional, multi-provider, and degrades honestly**: set
+`OPENROUTER_API_KEY` (free models — preferred) or `ANTHROPIC_API_KEY` (see
+`.env.example`) to enable it. Without any key, RevertLens still works fully via the
+deterministic linter + live on-chain decoding — it just adds no AI-inferred
+findings. It never fabricates output. (`src/ai/explain.ts`; OpenRouter default
+`openai/gpt-oss-120b:free`, Anthropic `claude-opus-4-7`.)
 
 ## How Injective is integrated
 

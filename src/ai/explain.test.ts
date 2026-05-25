@@ -5,8 +5,10 @@ import { explainRevertWithAI, isAIEnabled } from "./explain.js";
 // Locks the "no fake output" contract: with no API key, the AI explainer is
 // disabled and returns null — it never invents an explanation.
 test("AI explainer is disabled and returns null when no API key is set", async () => {
-  const prev = process.env.ANTHROPIC_API_KEY;
+  const prevAnthropic = process.env.ANTHROPIC_API_KEY;
+  const prevOpenRouter = process.env.OPENROUTER_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   try {
     assert.equal(isAIEnabled(), false);
     const result = await explainRevertWithAI({
@@ -18,6 +20,7 @@ test("AI explainer is disabled and returns null when no API key is set", async (
     });
     assert.equal(result, null);
   } finally {
-    if (prev !== undefined) process.env.ANTHROPIC_API_KEY = prev;
+    if (prevAnthropic !== undefined) process.env.ANTHROPIC_API_KEY = prevAnthropic;
+    if (prevOpenRouter !== undefined) process.env.OPENROUTER_API_KEY = prevOpenRouter;
   }
 });

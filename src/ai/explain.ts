@@ -3,27 +3,26 @@
 // The deterministic linter handles everything we can PROVE (precompile detection,
 // ABI mismatch, on-chain "no method" reverts). This module covers the long tail:
 // reverts with no verified mapping. It is OPTIONAL and degrades honestly —
-// with no ANTHROPIC_API_KEY it returns null (never fabricated output).
+// with no API key it returns null (never fabricated output).
 //
-// We use a raw JSON-schema structured output (not the zod helper) so this module
-// stays decoupled from the zod version the MCP server pins.
+// Multi-provider: prefers OpenRouter (free models) when OPENROUTER_API_KEY is
+// set, falls back to Anthropic when ANTHROPIC_API_KEY is set.
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { Finding } from "../types.js";
 import { PRECOMPILE_ABI } from "../precompiles/knowledge-base.js";
 
-// Per the Anthropic SDK guidance, default to the latest Opus.
-const MODEL = "claude-opus-4-7";
+const ANTHROPIC_MODEL = "claude-opus-4-7";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free";
 
 export function isAIEnabled(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY);
 }
 
-// Static system prompt built from the verified knowledge base. `cache_control`
-// is placed correctly so this caches once it exceeds the model's minimum
-// cacheable prefix (4096 tokens on Opus 4.7). Today the KB is small, so it
-// won't cache yet — but as the contributable KB grows, caching engages with
-// no code change. (Honest: no artificial padding to force a cache hit.)
+// Static system prompt built from the verified knowledge base. For the Anthropic
+// path, `cache_control` caches it once it exceeds the model minimum (4096 tokens
+// on Opus 4.7) — today the KB is small so it won't cache yet, but caching engages
+// as the KB grows with no code change. (No artificial padding to force a hit.)
 const SYSTEM_PROMPT = `You are RevertLens, an expert on debugging Injective EVM reverts.
 
 Injective exposes three EVM precompiles with NON-STANDARD ABIs that generic tools (Tenderly, Foundry) cannot decode:
@@ -66,45 +65,104 @@ export interface AIContext {
   onchainRevert: string | null;
 }
 
-/** Ask the LLM to explain a revert we have no verified answer for. Returns a
- *  Finding labelled `ai-inferred`, or null when disabled / on error. */
-export async function explainRevertWithAI(ctx: AIContext): Promise<Finding | null> {
-  if (!isAIEnabled()) return null;
-
-  const client = new Anthropic();
-  const userMsg =
+function buildUserMessage(ctx: AIContext): string {
+  return (
     `Explain this Injective EVM revert:\n` +
     `- to: ${ctx.to}\n` +
     `- target precompile: ${ctx.precompile ?? "none / regular contract"}\n` +
     `- selector: ${ctx.selector ?? "n/a"}\n` +
     `- on-chain revert reason: ${ctx.onchainRevert ?? "(call did not revert or reason unavailable)"}\n` +
-    `- calldata: ${ctx.data}`;
+    `- calldata: ${ctx.data}`
+  );
+}
 
+function toFinding(out: Explanation): Finding {
+  return {
+    severity: "warning",
+    code: "AI_EXPLANATION",
+    title: out.title,
+    detail: out.detail,
+    suggestedFix: out.suggestedFix?.trim() ? out.suggestedFix : undefined,
+    source: "ai-inferred",
+    confidence: Math.max(0, Math.min(1, Number(out.confidence) || 0)),
+  };
+}
+
+/** Defensively pull a JSON object out of model text (handles ```json fences / prose). */
+function extractJson(text: string): Explanation | null {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1] ?? text;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start === -1 || end <= start) return null;
   try {
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: userMsg }],
-      output_config: { format: { type: "json_schema", schema: EXPLANATION_SCHEMA } },
-    });
+    return JSON.parse(candidate.slice(start, end + 1)) as Explanation;
+  } catch {
+    return null;
+  }
+}
 
-    if (res.stop_reason === "refusal") return null;
-    const block = res.content.find((b) => b.type === "text");
-    if (!block || block.type !== "text") return null;
-
-    const out = JSON.parse(block.text) as Explanation;
-    return {
-      severity: "warning",
-      code: "AI_EXPLANATION",
-      title: out.title,
-      detail: out.detail,
-      suggestedFix: out.suggestedFix?.trim() ? out.suggestedFix : undefined,
-      source: "ai-inferred",
-      confidence: Math.max(0, Math.min(1, out.confidence)),
-    };
+/** Ask the LLM to explain a revert we have no verified answer for. Returns a
+ *  Finding labelled `ai-inferred`, or null when disabled / on error. */
+export async function explainRevertWithAI(ctx: AIContext): Promise<Finding | null> {
+  const userMsg = buildUserMessage(ctx);
+  try {
+    if (process.env.OPENROUTER_API_KEY) {
+      return await viaOpenRouter(userMsg);
+    }
+    if (process.env.ANTHROPIC_API_KEY) {
+      return await viaAnthropic(userMsg);
+    }
+    return null;
   } catch {
     // No fake output: if the model call or parse fails, we add no AI finding.
     return null;
   }
+}
+
+async function viaOpenRouter(userMsg: string): Promise<Finding | null> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "X-Title": "RevertLens",
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      max_tokens: 1500,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content:
+            userMsg +
+            `\n\nRespond with ONLY a JSON object: {"title": string, "detail": string, "suggestedFix": string, "confidence": number}.`,
+        },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const content = json.choices?.[0]?.message?.content;
+  if (!content) return null;
+  const out = extractJson(content);
+  return out ? toFinding(out) : null;
+}
+
+async function viaAnthropic(userMsg: string): Promise<Finding | null> {
+  const client = new Anthropic();
+  const res = await client.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 2048,
+    system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    messages: [{ role: "user", content: userMsg }],
+    output_config: { format: { type: "json_schema", schema: EXPLANATION_SCHEMA } },
+  });
+  if (res.stop_reason === "refusal") return null;
+  const block = res.content.find((b) => b.type === "text");
+  if (!block || block.type !== "text") return null;
+  const out = extractJson(block.text);
+  return out ? toFinding(out) : null;
 }

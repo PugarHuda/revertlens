@@ -34,10 +34,12 @@ npm run typecheck && npm run build
   Never let an AI-inferred result be presented as verified.
 - AI is load-bearing ONLY for: long-tail unknown selectors, contextual fix
   synthesis, plain-language phrasing. Deterministic logic is not "AI".
-- `src/ai/explain.ts` — optional Anthropic call (model `claude-opus-4-7`, raw
-  JSON-schema structured output; NOT the zod helper, to avoid clashing with the
-  zod v3 the MCP server pins). Gated on `ANTHROPIC_API_KEY`; returns null when
-  absent or on error. NEVER emit fabricated output here.
+- `src/ai/explain.ts` — optional, multi-provider. Prefers OpenRouter
+  (`OPENROUTER_API_KEY`, default model `openai/gpt-oss-120b:free`, OpenAI-compatible
+  fetch + JSON), falls back to Anthropic (`ANTHROPIC_API_KEY`, `claude-opus-4-7`,
+  raw JSON-schema structured output — NOT the zod helper, to avoid clashing with
+  the zod v3 the MCP server pins). Returns null when no key / on error. NEVER emit
+  fabricated output here. Test deletes both keys to stay deterministic.
 
 ## Key facts
 - Injective EVM mainnet chainID `1776`; testnet `1439`. Explorer: Blockscout.
