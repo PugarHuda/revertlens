@@ -22,13 +22,25 @@ export interface Analysis extends LintResult {
   onchainRevert: string | null;
 }
 
+/** Injectable dependencies — defaults are the real implementations. Lets the
+ *  orchestration (AI gating, dedupe, revert wiring) be unit-tested offline. */
+export interface AnalyzeDeps {
+  ethCall?: typeof ethCall;
+  explain?: typeof explainRevertWithAI;
+  aiEnabled?: typeof isAIEnabled;
+}
+
 /** Analyse a raw call: static findings + a live simulation of the same call. */
-export async function analyzeCall(input: AnalysisInput): Promise<Analysis> {
+export async function analyzeCall(input: AnalysisInput, deps: AnalyzeDeps = {}): Promise<Analysis> {
+  const runEthCall = deps.ethCall ?? ethCall;
+  const explain = deps.explain ?? explainRevertWithAI;
+  const aiEnabled = deps.aiEnabled ?? isAIEnabled;
+
   const staticResult = lint({ to: input.to, data: input.data });
   const findings: Finding[] = [...staticResult.findings];
   let onchainRevert: string | null = null;
 
-  const outcome = await ethCall(input.network, input.to, input.data);
+  const outcome = await runEthCall(input.network, input.to, input.data);
   if (!outcome.ok) {
     const decoded = decodeRevert(outcome.error.message, outcome.error.data);
     onchainRevert = decoded.reason;
@@ -59,9 +71,9 @@ export async function analyzeCall(input: AnalysisInput): Promise<Analysis> {
   const hasVerifiedExplanation = findings.some(
     (f) => f.source === "verified" && f.suggestedFix,
   );
-  const shouldAskAI = (input.useAI ?? true) && isAIEnabled() && !hasVerifiedExplanation;
+  const shouldAskAI = (input.useAI ?? true) && aiEnabled() && !hasVerifiedExplanation;
   if (shouldAskAI && (onchainRevert || staticResult.precompile)) {
-    const ai = await explainRevertWithAI({
+    const ai = await explain({
       to: input.to,
       data: input.data,
       precompile: staticResult.precompile,

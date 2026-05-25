@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Finding = {
   severity: "error" | "warning" | "info";
@@ -17,23 +17,59 @@ type Analysis = {
   onchainRevert: string | null;
   findings: Finding[];
 };
+type Mode = "call" | "tx";
+type Net = "testnet" | "mainnet";
 
 const BANK = "0x0000000000000000000000000000000000000064";
-// Real calldata: standard ERC20 balanceOf(address) — the #1 mistake against Bank.
-const PRESET_DATA =
-  "0x70a082310000000000000000000000001111111111111111111111111111111111111111";
+const EXCHANGE = "0x0000000000000000000000000000000000000065";
+const STAKING = "0x0000000000000000000000000000000000000066";
+
+// Real calldata for common mistakes (all hit the live chain).
+const PRESETS: { label: string; to: string; data: string }[] = [
+  {
+    label: "Bank · ERC20 balanceOf (wrong)",
+    to: BANK,
+    data: "0x70a082310000000000000000000000001111111111111111111111111111111111111111",
+  },
+  {
+    label: "Bank · ERC20 transfer (wrong)",
+    to: BANK,
+    data:
+      "0xa9059cbb" +
+      "0000000000000000000000001111111111111111111111111111111111111111" +
+      "0000000000000000000000000000000000000000000000000000000000000064",
+  },
+  { label: "Exchange · unknown selector", to: EXCHANGE, data: "0xdeadbeef" },
+  { label: "Staking · unknown selector", to: STAKING, data: "0xdeadbeef" },
+];
 
 export default function Home() {
-  const [mode, setMode] = useState<"tx" | "call">("call");
-  const [network, setNetwork] = useState<"testnet" | "mainnet">("testnet");
+  const [mode, setMode] = useState<Mode>("call");
+  const [network, setNetwork] = useState<Net>("testnet");
   const [hash, setHash] = useState("");
   const [to, setTo] = useState(BANK);
-  const [data, setData] = useState(PRESET_DATA);
+  const [data, setData] = useState(PRESETS[0]!.data);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Analysis | null>(null);
 
-  async function analyze() {
+  type Payload =
+    | { mode: "tx"; network: Net; hash: string }
+    | { mode: "call"; network: Net; to: string; data: string };
+
+  function syncUrl(p: Payload) {
+    const params = new URLSearchParams();
+    params.set("mode", p.mode);
+    params.set("network", p.network);
+    if (p.mode === "tx") params.set("hash", p.hash);
+    else {
+      params.set("to", p.to);
+      params.set("data", p.data);
+    }
+    window.history.replaceState(null, "", `?${params.toString()}`);
+  }
+
+  async function runAnalyze(p: Payload) {
     setLoading(true);
     setError(null);
     setResult(null);
@@ -41,19 +77,45 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          mode === "tx" ? { mode, network, hash } : { mode, network, to, data },
-        ),
+        body: JSON.stringify(p),
       });
       const body = await res.json();
       if (!res.ok) setError(body.error ?? "Request failed");
-      else setResult(body as Analysis);
+      else {
+        setResult(body as Analysis);
+        syncUrl(p);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
     } finally {
       setLoading(false);
     }
   }
+
+  function analyze() {
+    const p: Payload =
+      mode === "tx" ? { mode, network, hash } : { mode, network, to, data };
+    void runAnalyze(p);
+  }
+
+  // Deep-link: prefill from query params and auto-run a shared link.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const m = q.get("mode") === "tx" ? "tx" : q.get("to") || q.get("data") ? "call" : null;
+    const net: Net = q.get("network") === "mainnet" ? "mainnet" : "testnet";
+    setNetwork(net);
+    if (m === "tx" && q.get("hash")) {
+      setMode("tx");
+      setHash(q.get("hash")!);
+      void runAnalyze({ mode: "tx", network: net, hash: q.get("hash")! });
+    } else if (m === "call" && q.get("to") && q.get("data")) {
+      setMode("call");
+      setTo(q.get("to")!);
+      setData(q.get("data")!);
+      void runAnalyze({ mode: "call", network: net, to: q.get("to")!, data: q.get("data")! });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <main className="wrap">
@@ -91,11 +153,7 @@ export default function Home() {
         {mode === "tx" ? (
           <>
             <label>Transaction hash</label>
-            <input
-              value={hash}
-              onChange={(e) => setHash(e.target.value)}
-              placeholder="0x… (64 hex)"
-            />
+            <input value={hash} onChange={(e) => setHash(e.target.value)} placeholder="0x… (64 hex)" />
           </>
         ) : (
           <>
@@ -103,15 +161,20 @@ export default function Home() {
             <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="0x…" />
             <label>Calldata</label>
             <textarea value={data} onChange={(e) => setData(e.target.value)} placeholder="0x…" />
-            <button
-              className="preset"
-              onClick={() => {
-                setTo(BANK);
-                setData(PRESET_DATA);
-              }}
-            >
-              ↺ Load example: standard ERC20 balanceOf() against the Bank precompile
-            </button>
+            <div className="presets">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  className="chip"
+                  onClick={() => {
+                    setTo(p.to);
+                    setData(p.data);
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </>
         )}
 
@@ -125,7 +188,7 @@ export default function Home() {
           <>
             {result.onchainRevert && (
               <div className="revert">
-                <div className="lbl">Live on-chain revert</div>
+                <div className="lbl">Live on-chain revert · generic tools stop here</div>
                 <code>{result.onchainRevert}</code>
               </div>
             )}
@@ -154,6 +217,9 @@ export default function Home() {
                 )}
               </div>
             ))}
+            {result && !loading && (
+              <p className="share">🔗 Shareable link updated in your address bar.</p>
+            )}
           </>
         )}
       </div>

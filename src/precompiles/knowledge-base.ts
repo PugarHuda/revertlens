@@ -35,12 +35,20 @@ export const PRECOMPILE_ABI: Record<PrecompileName, readonly string[]> = {
     "delegation(address,string)",
     "withdrawDelegatorRewards(string)",
   ],
-  // Exchange is 28 struct-heavy functions; we seed the most-used and let the
-  // AI long-tail path handle the rest (see lint.ts).
+  // Exchange has 28 functions; the value-type entrypoints below were each
+  // VERIFIED against the live chain (their selectors are recognised). The
+  // remaining struct-heavy functions (order create/cancel batches) are left to
+  // the AI long-tail path rather than guessing tuple layouts (see lint.ts).
   exchange: [
-    "deposit(address,string,uint256)",
-    "withdraw(address,string,uint256)",
-    "subaccountDeposit(address,bytes32,string,uint256)",
+    "deposit(address,string,string,uint256)",
+    "withdraw(address,string,string,uint256)",
+    "subaccountDeposit(string,string)",
+    "subaccountDeposits(string,string,uint32)",
+    "subaccountPositions(string)",
+    "subaccountTransfer(address,string,string,string,uint256)",
+    "externalTransfer(address,string,string,string,uint256)",
+    "cancelDerivativeOrder(address,string,string,string,int32,string)",
+    "cancelSpotOrder(address,string,string,string,string)",
   ],
 };
 
