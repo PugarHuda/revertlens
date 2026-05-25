@@ -1,5 +1,9 @@
 # RevertLens
 
+[![CI](https://github.com/PugarHuda/revertlens/actions/workflows/ci.yml/badge.svg)](https://github.com/PugarHuda/revertlens/actions/workflows/ci.yml)
+&nbsp;[![Live demo](https://img.shields.io/badge/demo-revertlens.vercel.app-00d9a3)](https://revertlens.vercel.app)
+&nbsp;![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+
 **The only debugger that understands Injective EVM precompiles.** It decodes the
 opaque `execution reverted` errors that Tenderly, Foundry, and generic EVM tools
 cannot see — because they don't know that `0x64/0x65/0x66` are precompiles with
@@ -87,6 +91,25 @@ src/
   demo.ts                   # runnable proof
 ```
 
+## Limitations (honest)
+- **Exchange precompile is partially catalogued.** Bank & Staking ABIs are complete;
+  the Exchange precompile's 28 functions are partially seeded, so an unknown selector
+  there is a low-confidence hint, not a `verified` error. See [CONTRIBUTING](CONTRIBUTING.md).
+- **The AI long-tail is best-effort.** Free OpenRouter models are rate-limited and
+  bursty; on failure RevertLens stays silent rather than guessing. For reliable AI,
+  use your own key. The deterministic linter — the core value — needs no key at all.
+- **Nested contract→precompile reverts** depend on the chain propagating the revert
+  reason (it does for direct calls on current Injective; deep traces aren't exposed on
+  public RPC). The offline static linter covers this case regardless.
+- **The public `/api/analyze` has no rate limiting** and runs the AI model only when
+  `REVERTLENS_PUBLIC_AI=1`. Fine for a demo; add limits before heavy public use.
+
+## Roadmap
+- Full Exchange precompile ABI coverage (community-contributable knowledge base)
+- Staking bech32-vs-address mismatch detection
+- A GitHub Action that runs RevertLens on a PR's failing tests
+- VS Code inline revert explanations
+
 ## Status
-MVP. Open-source. Knowledge base is contributable — PRs adding precompile/error
-mappings welcome.
+MVP, open-source (MIT). The knowledge base is contributable — see
+[CONTRIBUTING.md](CONTRIBUTING.md). PRs adding verified precompile/error mappings welcome.
