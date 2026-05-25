@@ -25,3 +25,5 @@ next-env.d.ts
 
 # playwright mcp debug artifacts
 .playwright-mcp/
+
+.vercel

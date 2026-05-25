@@ -9,9 +9,9 @@ Fill the `<...>` placeholders after you push to GitHub / deploy.
 Submit at: https://xsxo494365r.typeform.com/to/uT6R8vhf
 
 - **Project name:** RevertLens
-- **GitHub repository:** `<https://github.com/youruser/revertlens>`
-- **Demo / product link:** `<https://revertlens.vercel.app>`
-- **Demo video:** `<youtube/loom link>`
+- **GitHub repository:** https://github.com/PugarHuda/revertlens
+- **Demo / product link:** https://revertlens.vercel.app
+- **Demo video:** `<youtube/loom link — record using §3>`
 - **Short description:**
   > RevertLens is the only debugger that understands Injective EVM precompiles. Generic tools (Tenderly, Foundry) go blind at Injective's Bank/Exchange/Staking precompiles and just say "execution reverted". RevertLens decodes those opaque reverts into plain English with a concrete fix — by reading the non-standard precompile ABIs that no generic tool knows. It runs against the live Injective chain (no mock data), ships as a web playground and an MCP server callable from Claude Code / Cursor, and labels every finding as verified (mechanically proven) or AI-inferred so a guess never masquerades as fact.
 
@@ -28,8 +28,8 @@ Submit at: https://xsxo494365r.typeform.com/to/uT6R8vhf
 > • Web playground + MCP server for @AnthropicAI Claude Code / Cursor
 > • Labels every finding ✔verified vs ~AI-inferred
 >
-> Code: `<github link>`
-> Demo: `<vercel link>`
+> Code: https://github.com/PugarHuda/revertlens
+> Demo: https://revertlens.vercel.app
 >
 > @injective @NinjaLabsHQ @NinjaLabsCN
 > #Injective #AI #Web3
