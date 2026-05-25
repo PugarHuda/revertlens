@@ -14,7 +14,7 @@
     "live": "tsx src/live-demo.ts",
     "mcp": "tsx src/mcp/server.ts",
     "mcp:smoke": "tsx src/mcp/smoke.ts",
-    "test": "node --test --import tsx src/**/*.test.ts"
+    "test": "node --test --import tsx \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
