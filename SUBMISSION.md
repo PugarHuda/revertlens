@@ -45,13 +45,15 @@ Submit at: https://xsxo494365r.typeform.com/to/uT6R8vhf
 `execution reverted`. That's it. Tenderly and Foundry can't help — they don't
 know Injective's precompiles exist."
 
-**0:20–0:55 — The reveal (web playground).**
-- `npm run dev`, open the playground.
-- Click the preset **"standard ERC20 balanceOf() against the Bank precompile"**.
-- Hit **Analyze**. Show the LIVE on-chain revert banner: `no method with id: 0x70a08231`.
+**0:20–0:55 — The reveal (LIVE playground at revertlens.vercel.app).**
+- Open the deployed site (no localhost — it's live).
+- Click the preset chip **"Bank · ERC20 balanceOf (wrong)"** → hit **Analyze**.
+- Show the LIVE on-chain revert banner: `no method with id: 0x70a08231`.
 - Show the two **✔ VERIFIED** findings + the fix: *"Bank precompile balanceOf takes
   (tokenAddress, account)."*
-- Emphasise: this hit the real Injective testnet, not a canned response.
+- Emphasise: this hit the real Injective chain, not a canned response. Then point at
+  the address bar — *"shareable link"* — and mention the other preset chips
+  (Exchange/Staking) to show breadth.
 
 **0:55–1:30 — Why it's unique.**
 - Open `src/precompiles/knowledge-base.ts`. Show the non-standard signatures
