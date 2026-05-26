@@ -26,4 +26,8 @@ next-env.d.ts
 # playwright mcp debug artifacts
 .playwright-mcp/
 
+# demo video build artifacts (final mp4 is uploaded to YouTube, not committed)
+vid/
+*.mp4
+
 .vercel
