@@ -77,3 +77,49 @@ know Injective's precompiles exist."
 - [x] How AI is used — load-bearing only for the long tail; deterministic core labelled verified
 - [x] Whether/how Injective is integrated — precompile-ABI-aware, live RPC, verified against InjectiveLabs/solidity-contracts
 - [x] What it does & how users interact — paste tx/calldata in the playground, or call the MCP tools
+
+---
+
+## 5. Screenshot deep-links (one-click → the result auto-renders, then screenshot)
+
+These links open the live demo with the case pre-loaded and **auto-run** the
+analysis — the revert + fix is on screen the moment it loads. No clicking.
+
+1. **Hero — Bank ERC20 mismatch** (the money shot: revert + ✔VERIFIED fix):
+   `https://revertlens.vercel.app/?mode=call&network=testnet&to=0x0000000000000000000000000000000000000064&data=0x70a082310000000000000000000000001111111111111111111111111111111111111111`
+
+2. **Breadth — Exchange precompile, unknown selector**:
+   `https://revertlens.vercel.app/?mode=call&network=testnet&to=0x0000000000000000000000000000000000000065&data=0xdeadbeef`
+
+Capture: open link → wait ~1s for "Analyzing on-chain…" to finish → screenshot the
+card (revert banner + findings). Do both for 2 distinct images.
+
+---
+
+## 6. X post — 3 variants (pick one; attach the §5 screenshots)
+
+**A — Punchy (hook-first, shortest):**
+> Every EVM debugger goes blind at Injective's precompiles. RevertLens doesn't. 🥷
+>
+> Paste a failed tx → it tells you *exactly* why it reverted, and the fix. Live on-chain, zero mock.
+>
+> 🔗 https://revertlens.vercel.app · code: https://github.com/PugarHuda/revertlens
+> @injective @NinjaLabsHQ @NinjaLabsCN
+
+**B — Problem→solution (default):**
+> Shipped RevertLens for the Injective Solo AI Builder Sprint 🥷
+>
+> Injective's Bank/Exchange/Staking precompiles use non-standard ABIs → Tenderly & Foundry just say "execution reverted". RevertLens decodes WHY + the fix.
+>
+> • Live chain, no mock • Web + MCP for Claude Code • Findings labelled ✔verified vs ~AI
+>
+> https://github.com/PugarHuda/revertlens · https://revertlens.vercel.app
+> @injective @NinjaLabsHQ @NinjaLabsCN #Injective #AI
+
+**C — Builder/technical:**
+> "execution reverted." Useless, right? Especially on Injective's precompiles, which Tenderly & Foundry don't even know exist.
+>
+> RevertLens reads the real precompile ABIs (verified vs InjectiveLabs/solidity-contracts) and decodes the live revert into a plain-English fix. Web + MCP server.
+>
+> 🔗 https://revertlens.vercel.app
+> @injective @NinjaLabsHQ @NinjaLabsCN
