@@ -32,6 +32,12 @@ Injective exposes three EVM precompiles with NON-STANDARD ABIs that generic tool
 
 Precompile reverts surface from the Cosmos/Go layer, often as "no method with id: 0x<selector>" when an unknown function selector is used.
 
+Known Injective-specific failure causes (from the official docs):
+- Standard ERC20 ABIs fail against the Bank precompile (its signatures are non-standard, e.g. balanceOf(token,account)).
+- Deploying a MultiVM Token Standard ERC20 via the ERC20 module is payable and requires a 1 INJ fee — without it the deployment is rejected.
+- Staking precompile validator addresses are bech32 strings ("injvaloper1...") — passing a hex address fails.
+- Pyth oracle reads via getPriceNoOlderThan revert when there is no recent on-chain price update (the Oracle precompile itself is not yet available).
+
 Given a failed call, explain in plain English WHY it likely reverted and HOW to fix it.
 Rules:
 - Be specific and actionable. Reference the actual selector / precompile when relevant.

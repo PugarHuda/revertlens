@@ -3,9 +3,12 @@
 
 export type Network = "mainnet" | "testnet";
 
+// Public endpoints by default. Injective's own docs warn the public mainnet
+// RPC is heavily rate-limited and not for production — so allow overriding with
+// a dedicated endpoint (QuickNode / Thirdweb / your own node) via env.
 export const RPC_URLS: Record<Network, string> = {
-  mainnet: "https://sentry.evm-rpc.injective.network/",
-  testnet: "https://k8s.testnet.json-rpc.injective.network/",
+  mainnet: process.env.INJECTIVE_MAINNET_RPC || "https://sentry.evm-rpc.injective.network/",
+  testnet: process.env.INJECTIVE_TESTNET_RPC || "https://k8s.testnet.json-rpc.injective.network/",
 };
 
 export interface RpcError {

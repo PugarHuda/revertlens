@@ -103,6 +103,9 @@ src/
   public RPC). The offline static linter covers this case regardless.
 - **The public `/api/analyze` has no rate limiting** and runs the AI model only when
   `REVERTLENS_PUBLIC_AI=1`. Fine for a demo; add limits before heavy public use.
+- **Default mainnet RPC is the public endpoint**, which Injective's own docs flag as
+  heavily rate-limited / not for production. Set `INJECTIVE_MAINNET_RPC` to a dedicated
+  endpoint (QuickNode / Thirdweb / your node) for reliable mainnet analysis.
 
 ## Roadmap
 - Full Exchange precompile ABI coverage (community-contributable knowledge base)
