@@ -14,6 +14,21 @@ cannot see — because they don't know that `0x64/0x65/0x66` are precompiles wit
 
 ---
 
+## Try it live (one click)
+
+These links open the deployed playground with the case pre-loaded and **auto-run** — the result renders on load.
+
+| Case | What it shows |
+|---|---|
+| [Bank · standard ERC20 `balanceOf` (wrong)](https://revertlens.vercel.app/?mode=call&network=testnet&to=0x0000000000000000000000000000000000000064&data=0x70a082310000000000000000000000001111111111111111111111111111111111111111) | The #1 mistake → ✔ verified mismatch + on-chain "no method" + the fix |
+| [Bank · standard ERC20 `transfer` (wrong)](https://revertlens.vercel.app/?mode=call&network=testnet&to=0x0000000000000000000000000000000000000064&data=0xa9059cbb00000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000064) | Same trap on `transfer` — Bank needs `(from, to, amount)` |
+| [Exchange · unknown selector](https://revertlens.vercel.app/?mode=call&network=testnet&to=0x0000000000000000000000000000000000000065&data=0xdeadbeef) | Long-tail case — chain confirms; AI hint when `OPENROUTER_API_KEY` is set |
+| [Staking · unknown selector](https://revertlens.vercel.app/?mode=call&network=testnet&to=0x0000000000000000000000000000000000000066&data=0xdeadbeef) | Fully-known ABI → verified error |
+
+Or run locally: `npm install && npm run dev`.
+
+---
+
 ## What it does & how you use it
 
 Paste a failed transaction hash **or** raw calldata + target address. RevertLens
@@ -81,14 +96,38 @@ deep tracing. Runtime `eth_call` revert enrichment is an optional upgrade.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  IN["tx hash<br/>or to + calldata"] --> S{Surface}
+  S -->|web| W["Playground<br/>(app/)"]
+  S -->|MCP| M["explain_revert<br/>lint_calldata"]
+  S -->|CLI| C["npm run live"]
+  W --> A[analyzeCall]
+  M --> A
+  C --> A
+  A --> L["Static linter<br/>knowledge-base.ts"]
+  A --> R["eth_call → live<br/>Injective RPC"]
+  L --> F[Findings]
+  R --> F
+  F -.->|no verified fix?| AI["AI long-tail<br/>OpenRouter / Anthropic"]
+  AI -.-> F
+  F --> O(("✔ verified<br/>or ~ AI-inferred"))
+```
+
 ```
 src/
   types.ts                  # Finding/CallInput; verified-vs-AI labelling
   precompiles/
     knowledge-base.ts       # THE MOAT — verified precompile ABIs + ERC20 confusions
-  linter/
-    lint.ts                 # offline static linter (no network)
-  demo.ts                   # runnable proof
+  linter/lint.ts            # offline static linter (no network)
+  rpc/injective.ts          # live RPC client (timeouts, RpcError, env-overridable)
+  runtime/
+    decode-revert.ts        # Error(string) + "no method with id" parser
+    analyze.ts              # orchestration: static + runtime + AI gating + dedupe
+  ai/explain.ts             # optional multi-provider explainer (OpenRouter / Anthropic)
+  mcp/server.ts             # MCP tools: explain_revert + lint_calldata
+  demo.ts / live-demo.ts    # runnable CLI proofs
+app/                        # Next.js 15 playground (hero surface)
 ```
 
 ## Limitations (honest)
